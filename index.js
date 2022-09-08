@@ -92,7 +92,6 @@ async function run() {
             };
             const result = await usersCollection.updateOne(filter, updatedDoc);
             res.send(result);
-
         })
 
         // Add new user
