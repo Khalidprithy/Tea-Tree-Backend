@@ -1,15 +1,13 @@
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const express = require('express');
-const jwt = require('jsonwebtoken');
+const express = require('express')
 const cors = require('cors');
-const res = require('express/lib/response');
-const { decode } = require('jsonwebtoken');
-const port = process.env.PORT || 5000;
-const app = express();
-
+var jwt = require('jsonwebtoken');
 require('dotenv').config();
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 
-// Middleware
+const app = express();
+const port = process.env.PORT || 5000;
+// middle ware
 
 app.use(cors());
 app.use(express.json());
@@ -45,7 +43,6 @@ async function run() {
         const productsCollection = client.db('teatree').collection('products');
         const purchaseCollection = client.db('teatree').collection('purchase');
         const reviewsCollection = client.db('teatree').collection('reviews');
-        const clientsCollection = client.db('teatree').collection('clients');
         const usersCollection = client.db('teatree').collection('users');
         const paymentsCollection = client.db('teatree').collection('payments');
 
@@ -53,40 +50,15 @@ async function run() {
 
         const verifyAdmin = async (req, res, next) => {
             const requester = req.decoded.email;
-            const requesterAccount = await usersCollection.findOne({ email: requester });
+            const requesterAccount = await userCollection.findOne({ email: requester });
             if (requesterAccount.role === 'admin') {
-                next()
+                next();
             }
             else {
-                res.status(403).send({ message: 'Forbidden action' })
+                res.status(403).send({ message: 'forbidden' });
             }
         }
 
-        // PRODUCTS API
-
-        // Get all products
-        app.get('/products', async (req, res) => {
-            const query = {};
-            const cursor = productsCollection.find(query);
-            const products = await cursor.toArray();
-            res.send(products);
-        })
-
-        // Find one product
-        app.get('/products/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const product = await productsCollection.findOne(query);
-            // console.log(product)
-            res.send(product);
-        })
-
-        // Add one product
-        app.post('/products', verifyJWT, verifyAdmin, async (req, res) => {
-            const product = req.body;
-            const result = await productsCollection.insertOne(product);
-            res.send(result)
-        })
 
         // USER API
 
@@ -95,6 +67,8 @@ async function run() {
             const users = await usersCollection.find().toArray();
             res.send(users)
         })
+
+        // Find one user
         app.get('/user/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const users = await usersCollection.findOne({ email: email }).toArray();
@@ -110,7 +84,7 @@ async function run() {
         })
 
         // Make Admin
-        app.put('/user/admin/:email', verifyJWT, verifyAdmin, async (req, res) => {
+        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const filter = { email: email };
             const updatedDoc = {
@@ -136,6 +110,32 @@ async function run() {
         })
 
 
+        // PRODUCTS API
+
+        // Get all products
+        app.get('/products', async (req, res) => {
+            const query = {};
+            const cursor = productsCollection.find(query);
+            const products = await cursor.toArray();
+            res.send(products);
+        })
+
+        // Find one product
+        app.get('/products/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const product = await productsCollection.findOne(query);
+            // console.log(product)
+            res.send(product);
+        })
+
+        // Add one product
+        app.post('/products', verifyJWT, async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
+            res.send(result)
+        })
+
 
         // PURCHASE API
 
@@ -143,7 +143,6 @@ async function run() {
         app.post('/purchase', async (req, res) => {
             const purchase = req.body;
             const query = { product: purchase.name, product: purchase.email }
-            // console.log(query)
             const exists = await purchaseCollection.findOne(query);
             if (exists) {
                 return res.send({ success: false, purchase: exists })
@@ -153,7 +152,7 @@ async function run() {
         })
 
         // Find one user's orders by email
-        app.get('/purchase', async (req, res) => {
+        app.get('/purchase', verifyJWT, async (req, res) => {
             const email = req.query.email;
             const decodedEmail = req.decoded.email;
             if (email === decodedEmail) {
@@ -167,14 +166,14 @@ async function run() {
         })
 
         // Load all orders
-        app.get('/allOrder', async (req, res) => {
+        app.get('/allOrder', verifyJWT, async (req, res) => {
             const orders = await purchaseCollection.find().toArray();
             console.log(orders)
             res.send(orders);
         })
 
         // Delete an order
-        app.delete('/purchase/:email', async (req, res) => {
+        app.delete('/purchase/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const query = { email: email };
             const result = purchaseCollection.deleteOne(query);
@@ -182,7 +181,7 @@ async function run() {
         })
 
         // Find an order by ID
-        app.get('/purchase/:id', async (req, res) => {
+        app.get('/purchase/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
             const payment = await purchaseCollection.findOne(query);
@@ -201,11 +200,11 @@ async function run() {
             }
             const result = await paymentsCollection.insertOne(payment);
             const updatedPurchase = await purchaseCollection.updateOne(filter, updatedDoc);
-            res.send(updatedDoc)
+            res.send(updatedPurchase)
 
         })
 
-        // REVIEWS API Need to work on it
+        // REVIEWS API
 
         // Load all reviews
         app.get('/reviews', async (req, res) => {
@@ -220,17 +219,6 @@ async function run() {
             const review = req.body;
             const result = await reviewsCollection.insertOne(review);
             res.send(result)
-        })
-
-
-        // CLIENT API
-
-        // Load all clients
-        app.get('/clients', async (req, res) => {
-            const query = {};
-            const cursor = clientsCollection.find(query);
-            const clients = await cursor.toArray();
-            res.send(clients);
         })
 
         // PAYMENT API
@@ -257,12 +245,10 @@ async function run() {
 
 run().catch(console.dir);
 
-
 app.get('/', (req, res) => {
-    res.send('Hello TeaTree')
+    res.send('Hello Tea Tree')
 })
 
 app.listen(port, () => {
     console.log(`Tea Tree app listening on port ${port}`)
 })
-
