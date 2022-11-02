@@ -245,9 +245,13 @@ async function run() {
 run().catch(console.dir);
 
 app.get('/', (req, res) => {
-    res.send('Hello Tea Tree')
+    res.send('Welcome to Tea Tree Server')
+})
+
+app.get('/test', (req, res) => {
+    res.send('Test API is working')
 })
 
 app.listen(port, () => {
-    console.log(`Tea Tree app listening on port ${port}`)
+    console.log(`Tea Tree server listening on port ${port}`)
 })
