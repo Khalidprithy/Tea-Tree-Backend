@@ -249,7 +249,7 @@ app.get('/', (req, res) => {
 })
 
 app.get('/test', (req, res) => {
-    res.send('Test API is working')
+    res.send('Test API for Tea Tree server. ')
 })
 
 app.listen(port, () => {
